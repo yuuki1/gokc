@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -35,11 +36,15 @@ func init() {
 }
 
 func main() {
-	var filepath string
-	var isVersion bool
+	var (
+		filepath  string
+		isVersion bool
+		printJSON bool
+	)
 	flag.StringVar(&filepath, "f", "/etc/keepalived/keepalived.conf", "keepalived.conf file path")
 	flag.BoolVar(&isVersion, "v", false, "print the version")
 	flag.BoolVar(&log.IsVerbose, "V", false, "verbose log mode")
+	flag.BoolVar(&printJSON, "json", false, "print configuration as json")
 	flag.Parse()
 
 	if isVersion {
@@ -57,7 +62,8 @@ func main() {
 	}
 	defer file.Close()
 
-	if err := parser.Parse(file, filepath); err != nil {
+	result, err := parser.Parse(file, filepath)
+	if err != nil {
 		if e, ok := err.(*parser.Error); ok {
 			msg := colorstring.Color(fmt.Sprintf("[white]%s:%d:%d: [red]%s[reset]", e.Filename, e.Line, e.Column, e.Message))
 			log.Error(msg)
@@ -65,6 +71,15 @@ func main() {
 			log.Error(err)
 		}
 	}
+	log.Debugf("%#v\n", result)
 
-	log.Infof("gokc: the configuration file %s syntax is ok", filepath)
+	if printJSON {
+		j, err := json.Marshal(result)
+		if err != nil {
+			log.Error(err)
+		}
+		fmt.Println(string(j))
+	} else {
+		log.Infof("gokc: the configuration file %s syntax is ok", filepath)
+	}
 }

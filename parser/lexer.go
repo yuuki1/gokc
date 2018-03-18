@@ -258,7 +258,8 @@ func (t *Tokenizer) NextAll() ([]*Token, error) {
 		}
 
 		result = append(result, &Token{
-			value:    token,
+			tok:      token,
+			lit:      s,
 			filename: t.filename,
 			line:     t.scanner.Line,
 			column:   t.scanner.Column,
@@ -332,17 +333,11 @@ func (t *Tokenizer) scanInclude(rawfilename string) ([]*Token, error) {
 	return result, nil
 }
 
-type Token struct {
-	value    int
-	filename string
-	line     int
-	column   int
-}
-
 type Lexer struct {
 	tokens []*Token
 	pos    int
 	e      error
+	result []BlockAny
 }
 
 type Error struct {
@@ -378,7 +373,8 @@ func (l *Lexer) Lex(lval *yySymType) int {
 		return EOF
 	}
 	token := l.nextToken()
-	return token.value
+	lval.token = *token
+	return token.tok
 }
 
 func (l *Lexer) Error(msg string) {
@@ -391,16 +387,16 @@ func (l *Lexer) Error(msg string) {
 	}
 }
 
-func Parse(src io.Reader, filename string) error {
+func Parse(src io.Reader, filename string) (Configuration, error) {
 	yyErrorVerbose = true
 	t := NewTokenizer(src, filename)
 	tokens, err := t.NextAll()
 	if err != nil {
-		return err
+		return Configuration{}, err
 	}
 	l := NewLexer(tokens)
 	if ret := yyParse(l); ret != 0 {
-		return l.e
+		return Configuration{}, l.e
 	}
-	return l.e
+	return Configuration{Blocks: l.result}, l.e
 }
